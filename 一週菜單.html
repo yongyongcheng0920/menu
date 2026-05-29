@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>一週菜單</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script>
+    const __cw = console.warn.bind(console);
+    console.warn = (...a) => { if(String(a[0]).includes('Babel')||String(a[0]).includes('precompile')) return; __cw(...a); };
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:#f7f3ee;font-family:"Noto Serif TC","Noto Sans TC",sans-serif;}
+    button{cursor:pointer;}
+    input,select,textarea{font-family:inherit;}
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" data-presets="react">
+const { useState, useEffect } = React;
+// ═══════════════════════════════════════════════════════════════
+// 菜色資料庫：每道菜都有完整食譜 + 主要食材標籤(key)
+// type: main(肉主菜) / one(一鍋) / egg(蛋豆) / veg(炒青菜) / blanch(燙青菜)
+// keys: 主要食材關鍵字，用來比對使用者輸入的食材
+// ═══════════════════════════════════════════════════════════════
+const DB = {
+  // ───── 一鍋類（本身有肉有菜，配一份燙青菜）─────
+  "咖哩": {type:"one",diff:2,keys:["紅蘿蔔","洋蔥","馬鈴薯","肉","雞","豬"],ing:["雞腿或豬肉300g","馬鈴薯2顆","紅蘿蔔1根","洋蔥1顆","咖哩塊半盒"],steps:["肉與蔬菜切塊","洋蔥下鍋炒香","加肉炒至變色","加水蓋過食材煮20分鐘","關火加咖哩塊拌融"],tip:"關火再加咖哩塊不易結塊，配一份燙青菜即可"},
+  "親子丼": {type:"one",diff:2,keys:["雞","雞腿","洋蔥","蛋"],ing:["雞腿1隻","洋蔥半顆","蛋2顆","醬油2匙","味醂1匙","糖"],steps:["雞肉切塊、洋蔥切絲","洋蔥炒軟後加雞肉","加醬油味醂糖煮熟","淋蛋液半熟即關火","蓋在白飯上"],tip:"蛋液分兩次下更滑嫩"},
+  "滷肉飯": {type:"one",diff:3,keys:["絞肉","五花","豬"],ing:["豬絞肉300g","紅蔥酥","醬油","糖","五香粉","水煮蛋"],steps:["絞肉炒出油","加紅蔥酥炒香","加醬油糖五香粉","加水小火滷30分鐘","淋在白飯上"],tip:"滷久一點更入味，可一次多做冷凍"},
+  "番茄牛肉麵": {type:"one",diff:3,keys:["牛肉","番茄","蕃茄"],ing:["牛腩300g","番茄2顆","薑蔥","醬油","豆瓣醬","麵條"],steps:["牛腩汆燙","番茄炒軟","加牛肉與調味料","加水燉40分鐘","煮麵後加湯與肉"],tip:"用電鍋燉更省事"},
+  "蛋炒飯": {type:"one",diff:1,keys:["蛋","飯","蔥"],ing:["白飯2碗","蛋3顆","蔥","醬油","鹽"],steps:["蛋打散","熱油炒蛋至半熟","下飯炒鬆","加醬油鹽與蔥花炒勻"],tip:"用隔夜飯最好炒"},
+  "什錦炒麵": {type:"one",diff:1,keys:["麵","肉絲","高麗菜","紅蘿蔔"],ing:["油麵1包","肉絲100g","高麗菜","紅蘿蔔絲","醬油"],steps:["肉絲炒香","下蔬菜炒軟","加油麵與醬油","拌炒均勻"],tip:"蔬菜可用冰箱現有的"},
+
+  // ───── 豬肉主菜 ─────
+  "魚香茄子": {type:"main",diff:2,keys:["茄子","絞肉"],ing:["茄子2條","絞肉100g","蒜末","薑末","豆瓣醬1匙","醬油","糖","醋"],steps:["茄子切條氣炸或過油至軟","爆香蒜薑與絞肉","加豆瓣醬炒出紅油","加茄子與調味料拌炒收汁"],tip:"茄子先泡鹽水防變黑"},
+  "蒜泥白肉": {type:"main",diff:2,keys:["五花","豬"],ing:["五花肉300g","蒜末3瓣","醬油2匙","糖","辣油"],steps:["五花肉冷水下鍋煮20分鐘","撈起冰鎮後切薄片","調蒜泥醬汁","淋醬即可"],tip:"煮好冰鎮肉質更Q彈"},
+  "回鍋肉": {type:"main",diff:2,keys:["五花","豬","高麗菜"],ing:["五花肉200g","高麗菜","蒜苗","豆瓣醬","甜麵醬"],steps:["五花肉煮七分熟切片","煸炒出油","加豆瓣甜麵醬炒香","下高麗菜蒜苗炒熟"],tip:"肉先煮過再炒不油膩"},
+  "螞蟻上樹": {type:"main",diff:2,keys:["冬粉","絞肉"],ing:["冬粉2把","絞肉100g","蒜末","豆瓣醬","醬油"],steps:["冬粉泡軟","爆香蒜與絞肉","加豆瓣醬炒香","下冬粉與水煮至吸收"],tip:"冬粉別泡太久以免糊掉"},
+  "打拋豬": {type:"main",diff:2,keys:["絞肉","九層塔","豬"],ing:["絞肉200g","九層塔","蒜","辣椒","魚露","醬油","糖"],steps:["爆香蒜辣椒","下絞肉炒散","加魚露醬油糖調味","起鍋前加九層塔"],tip:"九層塔最後放保香氣"},
+  "黑胡椒里肌肉": {type:"main",diff:2,keys:["里肌","豬"],ing:["里肌肉片200g","洋蔥","黑胡椒醬","醬油"],steps:["里肌肉醃醬油","煎至兩面金黃","加洋蔥炒軟","加黑胡椒醬炒勻"],tip:"里肌肉別煎太久會柴"},
+  "京醬肉絲": {type:"main",diff:2,keys:["肉絲","豬"],ing:["豬肉絲150g","甜麵醬","蔥絲","醬油","糖"],steps:["肉絲醃太白粉","炒肉絲至變色","加甜麵醬醬油糖炒勻","鋪在蔥絲上"],tip:"可搭配豆皮包著吃"},
+  "木須肉": {type:"main",diff:2,keys:["肉絲","木耳","蛋","豬"],ing:["豬肉絲150g","黑木耳","蛋2顆","小黃瓜","醬油"],steps:["蛋炒散盛起","炒肉絲","加木耳小黃瓜炒","倒回蛋與醬油炒勻"],tip:"木耳用乾的泡發或買新鮮的"},
+  "青椒肉絲": {type:"main",diff:2,keys:["青椒","肉絲","豬"],ing:["豬肉絲150g","青椒2顆","蒜","醬油","太白粉"],steps:["肉絲用醬油太白粉醃","青椒切絲","炒肉絲至變色盛起","炒青椒後倒回肉絲快炒"],tip:"肉絲先醃更嫩"},
+  "洋蔥炒肉片": {type:"main",diff:2,keys:["洋蔥","肉片","豬"],ing:["豬肉片150g","洋蔥1顆","醬油","糖"],steps:["洋蔥切絲","炒肉片至變色盛起","炒洋蔥至透明","倒回肉片加醬油糖炒勻"],tip:"洋蔥炒久會回甜"},
+  "糖醋里肌": {type:"main",diff:2,keys:["里肌","豬"],ing:["里肌肉200g","番茄醬","白醋","糖","太白粉"],steps:["里肌切塊沾粉煎熟","調糖醋醬煮滾","下肉塊裹醬"],tip:"糖醋比例約2醋2糖"},
+  "蔥爆豬肉": {type:"main",diff:2,keys:["豬","肉片","蔥"],ing:["豬肉片200g","青蔥3根","薑蒜","醬油","米酒"],steps:["肉片醃太白粉","大火炒肉片盛起","爆香蔥薑蒜","倒回肉片快炒調味"],tip:"大火快炒肉嫩"},
+
+  // ───── 雞肉主菜 ─────
+  "宮保雞丁": {type:"main",diff:2,keys:["雞","雞胸"],ing:["雞胸1塊","乾辣椒","花生","蔥","醬油","醋","糖"],steps:["雞丁醃過","爆香乾辣椒","下雞丁炒熟","加調味料與花生拌炒"],tip:"花生最後放保持脆度"},
+  "彩椒雞肉": {type:"main",diff:2,keys:["雞","彩椒"],ing:["雞胸或雞腿1塊","紅黃彩椒","蒜","鹽","黑胡椒"],steps:["雞肉切塊炒熟","彩椒切塊","下彩椒炒","加鹽黑胡椒調味"],tip:"配色繽紛又快速"},
+  "三杯雞": {type:"main",diff:3,keys:["雞","雞腿","九層塔"],ing:["雞腿2隻","薑片","蒜","九層塔","麻油","醬油","米酒","糖"],steps:["麻油爆香薑片","下蒜與雞肉煎香","加醬油米酒糖燒收汁","起鍋前加九層塔"],tip:"用黑麻油香氣更足"},
+  "塔香雞丁": {type:"main",diff:2,keys:["雞","九層塔"],ing:["雞胸1塊","九層塔","蒜","醬油","糖"],steps:["雞丁炒熟","爆香蒜","加醬油糖炒勻","加九層塔拌炒"],tip:"九層塔最後加"},
+  "蔥油雞丁": {type:"main",diff:2,keys:["雞","蔥"],ing:["雞腿2隻","蔥","薑","鹽","香油"],steps:["雞腿水煮或電鍋蒸熟","切塊","蔥薑切末加鹽香油","淋在雞肉上"],tip:"蒸雞最省事"},
+  "照燒雞排": {type:"main",diff:2,keys:["雞","雞排","雞腿"],ing:["去骨雞腿2隻","醬油","味醂","糖","蜂蜜"],steps:["雞腿煎至兩面金黃","調照燒醬汁倒入","收汁至濃稠裹勻"],tip:"雞皮朝下先煎逼出油"},
+  "檸檬雞柳": {type:"main",diff:2,keys:["雞","雞柳","檸檬"],ing:["雞柳200g","檸檬1顆","糖","鹽","太白粉"],steps:["雞柳沾粉煎熟","擠檸檬汁加糖煮成醬","淋在雞柳上"],tip:"酸甜開胃"},
+  "沙茶雞肉": {type:"main",diff:2,keys:["雞"],ing:["雞肉300g","沙茶醬","空心菜或洋蔥","醬油"],steps:["雞肉炒熟","加沙茶醬炒香","下青菜炒勻"],tip:"沙茶醬本身有鹹味，醬油少放"},
+  "醬爆雞丁": {type:"main",diff:2,keys:["雞"],ing:["雞胸1塊","甜麵醬","蒜","蔥","糖"],steps:["雞丁炒熟盛起","爆香蒜","加甜麵醬糖炒香","倒回雞丁炒勻"],tip:"甜麵醬加點水較好炒開"},
+
+  // ───── 牛肉主菜 ─────
+  "蔥爆牛肉": {type:"main",diff:2,keys:["牛肉","牛","蔥"],ing:["牛肉片200g","蔥3根","薑蒜","醬油","米酒"],steps:["牛肉醃太白粉","大火炒牛肉變色盛起","爆香蔥薑蒜","倒回牛肉快炒"],tip:"全程大火牛肉才嫩"},
+  "黑胡椒牛柳": {type:"main",diff:2,keys:["牛肉","牛"],ing:["牛肉條200g","洋蔥","黑胡椒醬","醬油"],steps:["牛肉炒至變色盛起","炒洋蔥","加黑胡椒醬","倒回牛肉炒勻"],tip:"牛肉別炒過頭"},
+  "沙茶牛肉": {type:"main",diff:2,keys:["牛肉","牛","空心菜"],ing:["牛肉片200g","空心菜","沙茶醬","蒜","醬油"],steps:["牛肉醃過","炒牛肉盛起","炒空心菜","加沙茶醬與牛肉炒勻"],tip:"快炒上桌"},
+  "番茄炒牛肉": {type:"main",diff:2,keys:["牛肉","牛","番茄","蕃茄"],ing:["牛肉片200g","番茄2顆","蔥","醬油","糖"],steps:["牛肉炒變色盛起","番茄炒出汁","加糖醬油","倒回牛肉炒勻"],tip:"番茄去皮口感更好"},
+  "青椒牛肉": {type:"main",diff:2,keys:["牛肉","牛","青椒"],ing:["牛肉片200g","青椒2顆","蒜","蠔油"],steps:["牛肉醃過炒熟盛起","炒青椒絲","加蠔油與牛肉炒勻"],tip:"青椒保持脆度"},
+
+  // ───── 海鮮主菜（只用魚片、蝦仁）─────
+  "煎魚片": {type:"main",diff:1,keys:["魚片","魚"],ing:["魚片2片","鹽","胡椒","少許麵粉"],steps:["魚片擦乾抹鹽胡椒","薄沾麵粉","中火煎至兩面金黃"],tip:"用鯛魚片或巴沙魚片，退冰即可"},
+  "糖醋魚片": {type:"main",diff:2,keys:["魚片","魚"],ing:["魚片2片","番茄醬","白醋","糖","太白粉"],steps:["魚片沾粉煎熟盛起","調糖醋醬煮滾","淋在魚片上"],tip:"用無刺魚片最方便"},
+  "豆瓣魚片": {type:"main",diff:2,keys:["魚片","魚"],ing:["魚片2片","豆瓣醬","蒜","蔥","醬油","糖"],steps:["魚片煎熟盛起","爆香蒜","加豆瓣醬糖炒香","淋在魚片上撒蔥花"],tip:"魚片先煎定型再淋醬"},
+  "蝦仁炒蛋": {type:"main",diff:1,keys:["蝦仁","蝦","蛋"],ing:["冷凍蝦仁150g","蛋3顆","蔥","鹽"],steps:["蝦仁退冰擦乾","蛋打散","炒蝦仁至變色盛起","炒蛋半熟倒回蝦仁拌炒"],tip:"冷凍蝦仁退冰即可，免處理"},
+  "蝦仁滑蛋": {type:"main",diff:1,keys:["蝦仁","蝦","蛋"],ing:["冷凍蝦仁150g","蛋4顆","蔥","太白粉水"],steps:["蝦仁退冰","蛋液加太白粉水","炒蝦仁盛起","蛋液半凝固加蝦仁推成滑蛋"],tip:"蛋別炒太老"},
+  "宮保蝦仁": {type:"main",diff:2,keys:["蝦仁","蝦"],ing:["冷凍蝦仁150g","乾辣椒","蒜","花生","醬油","糖","醋"],steps:["蝦仁退冰擦乾","爆香乾辣椒蒜","下蝦仁炒變色","加調味料與花生拌炒"],tip:"蝦仁變色就好別過熟"},
+  "彩椒蝦仁": {type:"main",diff:2,keys:["蝦仁","蝦","彩椒"],ing:["冷凍蝦仁150g","紅黃彩椒","蒜","鹽"],steps:["蝦仁退冰","彩椒切塊","爆香蒜下彩椒炒","加蝦仁炒熟調味"],tip:"配色漂亮又快速"},
+  "蒜香蝦仁": {type:"main",diff:2,keys:["蝦仁","蝦"],ing:["冷凍蝦仁200g","蒜末5瓣","奶油","鹽","巴西里"],steps:["蝦仁退冰擦乾","奶油融化爆香蒜","下蝦仁炒熟","加鹽調味"],tip:"奶油蒜香超下飯"},
+
+  // ───── 加工/簡便主菜 ─────
+  "香腸炒時蔬": {type:"main",diff:1,keys:["香腸"],ing:["香腸3根","青椒或彩椒","蒜","醬油"],steps:["香腸煎或煮熟切片","蔬菜切塊","一起炒勻"],tip:"香腸先蒸過再煎更快"},
+  "培根高麗菜": {type:"main",diff:1,keys:["培根","高麗菜"],ing:["培根3片","高麗菜半顆","蒜","鹽"],steps:["培根煎香切段","爆香蒜","下高麗菜大火炒","加鹽調味"],tip:"培根本身有鹹味鹽少放"},
+  "氣炸花枝丸": {type:"main",diff:1,keys:["花枝丸"],ing:["花枝丸1包","胡椒鹽"],steps:["花枝丸放氣炸鍋","180度8分鐘","撒胡椒鹽"],tip:"最省事，免顧火"},
+  "熱狗炒蛋": {type:"main",diff:1,keys:["熱狗","蛋"],ing:["熱狗3根","蛋3顆","蔥","醬油"],steps:["熱狗切片煎香","加蛋液炒散","撒蔥花調味"],tip:"小朋友也愛吃"},
+
+  // ───── 豆製品主菜 ─────
+  "照燒豆腐": {type:"main",diff:2,keys:["豆腐"],ing:["板豆腐1盒","醬油2匙","味醂","糖","白芝麻"],steps:["豆腐切片煎至兩面金黃","調照燒醬汁倒入","收汁至濃稠","撒白芝麻"],tip:"豆腐先吸乾水分好煎"},
+  "紅燒豆腐": {type:"main",diff:2,keys:["豆腐"],ing:["板豆腐1盒","醬油","蠔油","蒜","蔥","糖"],steps:["豆腐切塊煎黃","爆香蒜","加醬油蠔油糖與水","下豆腐燒入味"],tip:"板豆腐較不易破"},
+  "麻婆豆腐": {type:"main",diff:3,keys:["豆腐","絞肉"],ing:["嫩豆腐1盒","絞肉100g","豆瓣醬","花椒粉","蒜末","太白粉水"],steps:["爆香蒜與絞肉","加豆瓣醬炒紅","加水與豆腐輕推煮入味","勾芡撒花椒粉"],tip:"豆腐用推的不要翻炒"},
+  "家常豆腐": {type:"main",diff:2,keys:["豆腐","絞肉"],ing:["板豆腐1盒","絞肉50g","蒜","豆瓣醬","醬油"],steps:["豆腐切塊煎微黃","爆香蒜與絞肉","加豆瓣醬炒香","下豆腐燒入味"],tip:"板豆腐好煎不碎"},
+  "醬燒豆包": {type:"main",diff:2,keys:["豆包"],ing:["生豆包3片","醬油","糖","蒜","蔥"],steps:["豆包煎至兩面金黃","爆香蒜","加醬油糖與水","下豆包燒入味"],tip:"豆包煎香再燒更入味"},
+  "三杯豆腐": {type:"main",diff:2,keys:["豆腐","九層塔"],ing:["板豆腐1盒","薑","蒜","九層塔","麻油","醬油","糖"],steps:["豆腐切塊煎黃","麻油爆香薑蒜","加醬油糖燒","起鍋加九層塔"],tip:"素食版三杯雞"},
+
+  // ───── 蛋豆料理（可當配菜或主菜）─────
+  "紅蘿蔔炒蛋": {type:"egg",diff:1,keys:["紅蘿蔔","蛋"],ing:["紅蘿蔔1根","蛋3顆","鹽"],steps:["紅蘿蔔刨絲","蛋打散","炒紅蘿蔔絲至軟","加蛋液拌炒至熟"],tip:"紅蘿蔔先炒軟營養好吸收"},
+  "洋蔥炒蛋": {type:"egg",diff:1,keys:["洋蔥","蛋"],ing:["洋蔥1顆","蛋3顆","鹽","醬油"],steps:["洋蔥切絲炒軟","加蛋液","炒至蛋熟調味"],tip:"洋蔥炒軟帶甜"},
+  "蕃茄炒蛋": {type:"egg",diff:1,keys:["蕃茄","番茄","蛋"],ing:["蕃茄2顆","蛋3顆","蔥","糖","鹽"],steps:["蛋打散炒半熟盛起","蕃茄切塊炒出汁","加糖鹽","倒回蛋拌炒"],tip:"加點糖平衡酸味"},
+  "菜脯蛋": {type:"egg",diff:1,keys:["菜脯","蘿蔔乾","蛋"],ing:["蛋3顆","菜脯50g","蔥"],steps:["菜脯泡水去鹹切碎","與蛋液蔥花拌勻","熱油煎兩面金黃"],tip:"菜脯先炒過更香"},
+  "蔥花蛋": {type:"egg",diff:1,keys:["蔥","蛋"],ing:["蛋3顆","蔥2根","鹽"],steps:["蔥切花","與蛋液拌勻加鹽","熱油煎熟"],tip:"簡單快速"},
+  "九層塔煎蛋": {type:"egg",diff:1,keys:["九層塔","蛋"],ing:["蛋3顆","九層塔1把","鹽"],steps:["九層塔切碎","與蛋液拌勻","熱油煎兩面金黃"],tip:"九層塔香氣十足"},
+  "玉米炒蛋": {type:"egg",diff:1,keys:["玉米","蛋"],ing:["玉米粒1碗","蛋3顆","蔥","鹽"],steps:["蛋打散","炒蛋半熟","加玉米粒炒勻","調味"],tip:"罐頭玉米也可"},
+  "蒸蛋": {type:"egg",diff:1,keys:["蛋"],ing:["蛋3顆","溫水1.5倍","鹽","蔥花"],steps:["蛋加溫水鹽打散","過篩去泡","電鍋蒸12分鐘(留縫)","撒蔥花"],tip:"過篩+留縫蒸出來滑嫩"},
+  "雞蛋豆腐炒玉米筍": {type:"egg",diff:1,keys:["雞蛋豆腐","玉米筍"],ing:["雞蛋豆腐1盒","玉米筍","蔥","醬油"],steps:["雞蛋豆腐切塊煎黃","玉米筍切段","一起炒","加醬油調味"],tip:"雞蛋豆腐先煎定型"},
+
+  // ───── 炒青菜 ─────
+  "炒高麗菜": {type:"veg",diff:1,keys:["高麗菜"],ing:["高麗菜半顆","蒜","鹽"],steps:["高麗菜手撕成片","爆香蒜","大火快炒","加鹽"],tip:"大火快炒保脆度"},
+  "炒青江菜": {type:"veg",diff:1,keys:["青江菜"],ing:["青江菜","蒜","鹽"],steps:["青江菜洗淨切段","爆香蒜","大火炒","加鹽"],tip:"梗先下葉後下"},
+  "炒空心菜": {type:"veg",diff:1,keys:["空心菜"],ing:["空心菜1把","蒜","鹽","沙茶(可選)"],steps:["空心菜切段","爆香蒜","大火快炒","加鹽"],tip:"大火快炒不出水"},
+  "蒜炒地瓜葉": {type:"veg",diff:1,keys:["地瓜葉"],ing:["地瓜葉1把","蒜","鹽"],steps:["地瓜葉洗淨","爆香蒜","下地瓜葉炒軟","加鹽"],tip:"加點水避免太乾"},
+  "清炒菠菜": {type:"veg",diff:1,keys:["菠菜"],ing:["菠菜1把","蒜","鹽"],steps:["菠菜切段","爆香蒜","快炒","加鹽"],tip:"菠菜易熟快炒"},
+  "蝦皮絲瓜": {type:"veg",diff:1,keys:["絲瓜"],ing:["絲瓜1條","蝦皮","蒜","鹽"],steps:["絲瓜削皮切塊","爆香蒜與蝦皮","下絲瓜炒","加少許水燜軟"],tip:"絲瓜會出水不用加太多水"},
+  "乾煸四季豆": {type:"veg",diff:1,keys:["四季豆"],ing:["四季豆300g","絞肉50g","蒜","醬油"],steps:["四季豆煎或氣炸至表皮起皺","爆香蒜與絞肉","下四季豆炒勻調味"],tip:"氣炸最省油"},
+  "椒鹽杏鮑菇": {type:"veg",diff:1,keys:["杏鮑菇","菇"],ing:["杏鮑菇2根","蒜末","胡椒鹽","蔥"],steps:["杏鮑菇切塊","乾煎或氣炸至金黃","撒蒜末胡椒鹽蔥花"],tip:"乾煎逼出水分更香"},
+  "香菇炒豆乾": {type:"veg",diff:1,keys:["香菇","豆乾"],ing:["香菇5朵","豆乾5片","蔥","醬油"],steps:["香菇豆乾切片","爆香","炒香菇豆乾","加醬油炒勻"],tip:"可加肉絲更豐富"},
+  "炒水蓮": {type:"veg",diff:1,keys:["水蓮"],ing:["水蓮1把","薑絲","蒜","鹽"],steps:["水蓮切段","爆香薑蒜","大火快炒","加鹽"],tip:"快炒保持脆度"},
+  "番茄炒蛋": {type:"veg",diff:1,keys:["番茄","蕃茄","蛋"],ing:["番茄2顆","蛋3顆","蔥","糖","鹽"],steps:["蛋炒半熟盛起","番茄炒出汁","加糖鹽","倒回蛋拌炒"],tip:"經典家常"},
+  "炒大白菜": {type:"veg",diff:1,keys:["大白菜","白菜"],ing:["大白菜半顆","蒜","鹽","蝦皮(可選)"],steps:["大白菜切片","爆香蒜","下白菜炒軟","加鹽"],tip:"白菜會出水可不加水"},
+  "蒜炒青花菜": {type:"veg",diff:1,keys:["青花菜","花椰菜","綠花椰"],ing:["青花菜1顆","蒜","鹽"],steps:["青花菜切小朵汆燙","爆香蒜","下青花菜炒","加鹽"],tip:"先汆燙再炒更快熟"},
+  "清炒豆芽": {type:"veg",diff:1,keys:["豆芽"],ing:["豆芽菜1包","韭菜","蒜","鹽"],steps:["豆芽洗淨","爆香蒜","大火快炒","加鹽"],tip:"快炒保脆"},
+
+  // ───── 燙青菜（配一鍋類）─────
+  "燙花椰菜": {type:"blanch",diff:1,keys:["花椰菜","白花椰","青花菜"],ing:["花椰菜1顆","鹽","蒜醬油(沾)"],steps:["花椰菜切小朵","滾水加鹽燙3分鐘","撈起瀝乾","可沾蒜醬油"],tip:"水裡加鹽顏色更綠"},
+  "燙高麗菜": {type:"blanch",diff:1,keys:["高麗菜"],ing:["高麗菜半顆","鹽","醬油膏(沾)"],steps:["高麗菜切片","滾水燙軟","撈起瀝乾","淋醬油膏"],tip:"燙過保留清甜"},
+  "燙小白菜": {type:"blanch",diff:1,keys:["小白菜"],ing:["小白菜1把","鹽","香油"],steps:["小白菜切段","滾水燙熟","瀝乾","淋香油鹽"],tip:"燙30秒即可"},
+  "燙地瓜葉": {type:"blanch",diff:1,keys:["地瓜葉"],ing:["地瓜葉1把","蒜","醬油膏"],steps:["地瓜葉洗淨","滾水燙熟","瀝乾","淋蒜末醬油膏"],tip:"燙好淋醬最簡單"},
+  "燙青江菜": {type:"blanch",diff:1,keys:["青江菜"],ing:["青江菜","鹽","香油"],steps:["青江菜對半切","滾水燙熟","瀝乾","淋香油"],tip:"清爽配咖哩剛好"},
+  "燙彩椒": {type:"blanch",diff:1,keys:["彩椒","甜椒"],ing:["紅黃彩椒","橄欖油","鹽"],steps:["彩椒切條","滾水快燙","瀝乾","淋橄欖油鹽"],tip:"燙過保留脆甜"},
+  "燙青花菜": {type:"blanch",diff:1,keys:["青花菜","花椰菜"],ing:["青花菜1顆","鹽"],steps:["切小朵","滾水加鹽燙3分鐘","瀝乾"],tip:"配咖哩清爽解膩"},
+  "燙秋葵": {type:"blanch",diff:1,keys:["秋葵"],ing:["秋葵10根","鹽","柴魚醬油(沾)"],steps:["秋葵去蒂","滾水燙2分鐘","冰鎮","沾柴魚醬油"],tip:"冰鎮後更脆"},
+
+  // ───── 新增豬肉主菜 ─────
+  "蒼蠅頭": {type:"main",diff:2,keys:["絞肉","韭菜花","豆豉"],ing:["絞肉150g","韭菜花1把","豆豉","辣椒","蒜","醬油"],steps:["爆香蒜辣椒豆豉","下絞肉炒散","加韭菜花段快炒","加醬油調味"],tip:"韭菜花保持脆度別炒過頭"},
+  "鳳梨炒豬肉": {type:"main",diff:2,keys:["豬","肉片","鳳梨"],ing:["豬肉片200g","鳳梨片","彩椒","醬油","糖"],steps:["肉片炒至變色","加鳳梨彩椒炒","以醬油糖調味"],tip:"罐頭鳳梨也可，酸甜開胃"},
+  "蔥燒里肌": {type:"main",diff:2,keys:["里肌","豬","蔥"],ing:["里肌肉片200g","青蔥","醬油","糖","米酒"],steps:["里肌煎香","加大量蔥段","醬油糖米酒燒入味"],tip:"蔥燒香氣濃"},
+  "椒鹽豬排": {type:"main",diff:2,keys:["豬排","里肌","豬"],ing:["豬里肌排2片","蒜末","胡椒鹽","蔥"],steps:["豬排拍鬆醃過","煎或氣炸至金黃","撒蒜末胡椒鹽蔥花"],tip:"拍鬆後肉更嫩"},
+  "蜜汁火腿蛋炒": {type:"main",diff:1,keys:["火腿","蛋"],ing:["火腿3片","蛋3顆","蔥"],steps:["火腿切丁","炒蛋半熟","加火腿丁拌炒","撒蔥花"],tip:"早餐剩火腿也能用"},
+
+  // ───── 新增雞肉主菜 ─────
+  "蔥薑雞": {type:"main",diff:2,keys:["雞","雞腿"],ing:["雞腿2隻","蔥","薑","醬油","米酒"],steps:["雞肉切塊","爆香蔥薑","下雞肉炒","加醬油米酒燒熟"],tip:"簡單下飯"},
+  "咖哩雞": {type:"main",diff:2,keys:["雞","咖哩","馬鈴薯"],ing:["雞腿2隻","馬鈴薯","紅蘿蔔","咖哩塊"],steps:["雞肉蔬菜切塊炒","加水煮軟","關火加咖哩塊拌融"],tip:"當主菜配白飯青菜"},
+  "蒜泥雞": {type:"main",diff:1,keys:["雞","雞胸"],ing:["雞胸1塊","蒜末","醬油膏","辣油"],steps:["雞胸水煮或蒸熟","剝絲","淋蒜泥醬油膏"],tip:"水煮雞胸最省事健康"},
+  "塔香三杯杏鮑菇雞": {type:"main",diff:2,keys:["雞","杏鮑菇","九層塔"],ing:["雞腿1隻","杏鮑菇","九層塔","薑蒜","麻油","醬油"],steps:["麻油爆香薑蒜","下雞肉杏鮑菇炒","醬油糖燒","加九層塔"],tip:"杏鮑菇吸醬汁很香"},
+  "可樂雞翅": {type:"main",diff:2,keys:["雞翅","雞"],ing:["雞翅8隻","可樂1罐","醬油","薑"],steps:["雞翅煎香","加可樂醬油薑","小火燒至收汁"],tip:"可樂的糖讓醬汁亮亮的"},
+
+  // ───── 新增牛肉/海鮮 ─────
+  "蠔油牛肉": {type:"main",diff:2,keys:["牛肉","牛"],ing:["牛肉片200g","蠔油","蒜","蔥","太白粉"],steps:["牛肉醃太白粉","大火快炒","加蠔油蒜蔥炒勻"],tip:"牛肉滑嫩關鍵在大火快炒"},
+  "蝦仁豆腐": {type:"main",diff:2,keys:["蝦仁","蝦","豆腐"],ing:["冷凍蝦仁150g","嫩豆腐1盒","蔥","蠔油","太白粉水"],steps:["蝦仁退冰","豆腐切塊","炒蝦仁加豆腐","蠔油調味勾薄芡"],tip:"豆腐輕推不弄碎"},
+  "塔香蝦仁": {type:"main",diff:1,keys:["蝦仁","蝦","九層塔"],ing:["冷凍蝦仁200g","九層塔","蒜","醬油"],steps:["蝦仁退冰擦乾","爆香蒜","下蝦仁炒熟","加九層塔醬油拌炒"],tip:"快炒上桌"},
+  "魚片豆腐湯": {type:"main",diff:1,keys:["魚片","魚","豆腐"],ing:["魚片2片","嫩豆腐1盒","薑絲","蔥","鹽"],steps:["水滾下薑絲","加豆腐","下魚片煮熟","加鹽蔥花"],tip:"魚片最後下避免煮散"},
+
+  // ───── 新增蛋豆 ─────
+  "皮蛋瘦肉": {type:"egg",diff:2,keys:["皮蛋","絞肉","肉"],ing:["皮蛋2顆","絞肉100g","蔥","醬油"],steps:["皮蛋切塊","絞肉炒散","加皮蛋拌炒","醬油調味撒蔥"],tip:"皮蛋增添風味"},
+  "蒜苗炒豆乾": {type:"egg",diff:1,keys:["豆乾","蒜苗"],ing:["豆乾8片","蒜苗","辣椒","醬油"],steps:["豆乾切片","炒香","加蒜苗辣椒","醬油調味"],tip:"豆乾先煎香更好吃"},
+  "毛豆炒蛋": {type:"egg",diff:1,keys:["毛豆","蛋"],ing:["毛豆仁1碗","蛋3顆","鹽"],steps:["毛豆汆燙","蛋炒散","加毛豆拌炒調味"],tip:"冷凍毛豆仁很方便"},
+
+  // ───── 新增青菜 ─────
+  "蒜炒芥蘭": {type:"veg",diff:1,keys:["芥蘭","芥藍"],ing:["芥蘭1把","蒜","鹽","米酒"],steps:["芥蘭切段","爆香蒜","下芥蘭炒","加米酒鹽"],tip:"加米酒去苦味"},
+  "塔香茄子": {type:"veg",diff:2,keys:["茄子","九層塔"],ing:["茄子2條","九層塔","蒜","醬油","糖"],steps:["茄子切段氣炸或過油","爆香蒜","加醬油糖","拌入茄子與九層塔"],tip:"茄子先炸過顏色漂亮"},
+};
+
+// 依類型取出菜名
+const byType = (t) => Object.keys(DB).filter(k=>DB[k].type===t);
+
+const FRUITS_BY_MONTH = {1:["茂谷柑","椪柑","草莓","蓮霧","芭樂","香蕉"],2:["草莓","茂谷柑","蓮霧","鳳梨","芭樂","香蕉"],3:["草莓","鳳梨","枇杷","蓮霧","芭樂","香蕉"],4:["鳳梨","芒果","枇杷","桑椹","香蕉"],5:["芒果","荔枝","鳳梨","梅子","香瓜","香蕉"],6:["芒果","荔枝","龍眼","西瓜","百香果","香蕉"],7:["芒果","龍眼","西瓜","百香果","火龍果","蓮霧","香蕉"],8:["龍眼","西瓜","百香果","火龍果","梨子","葡萄","香蕉"],9:["梨子","葡萄","百香果","柚子","蘋果","香蕉"],10:["柚子","柿子","葡萄","梨子","蘋果","奇異果","香蕉"],11:["柿子","奇異果","蘋果","柑橘","草莓","芭樂","香蕉"],12:["草莓","茂谷柑","椪柑","柿子","蘋果","芭樂","香蕉"]};
+const FAVE_FRUITS = ["柳橙","小蕃茄","無籽葡萄","蘋果","奇異果"];
+const getFruits = () => {
+  const m=new Date().getMonth()+1, prev=m===1?12:m-1, next=m===12?1:m+1;
+  const peak=new Set(FRUITS_BY_MONTH[m]||[]);
+  const all=new Set([...(FRUITS_BY_MONTH[prev]||[]),...(FRUITS_BY_MONTH[m]||[]),...(FRUITS_BY_MONTH[next]||[])]);
+  return [...all].map(f=>({name:f,peak:peak.has(f),fav:FAVE_FRUITS.includes(f)}));
+};
+
+const CATS = {"葉菜類":2,"豆腐":2,"海鮮":2,"肉類":3,"豆干":4,"菇類":4,"雞蛋":7,"水果":5,"根莖類":7,"冷凍":14,"乾貨":30,"其他":5};
+const SHIFTS = {
+  D:{label:"D班",time:"07:30–16:30",color:"#f5ece4",together:true,portions:4,desc:"愛迪生17:30到家可備料，一起煮4人份"},
+  C:{label:"C班",time:"11:00–20:00",color:"#f5f0e4",together:false,portions:3,desc:"Ginny自己煮3人份，愛迪生21:00到家洗碗"},
+  F:{label:"F班",time:"14:00–23:00",color:"#e8eef5",together:false,portions:3,desc:"愛迪生13:00前備料，Ginny晚上煮3人份"},
+  N:{label:"N班",time:"22:30–07:30",color:"#ede8f5",together:true,portions:4,desc:"19:30–21:30一起煮4人份，21:30前完成"},
+  休:{label:"休假",time:"全天",color:"#e8f2ec",together:true,portions:4,desc:"全天彈性，煮4人份"},
+};
+const SK = ["D","C","F","N","休"];
+const HOL = {"2025-01-01":"元旦","2025-02-28":"和平紀念日","2025-04-04":"清明節","2025-05-01":"勞動節","2025-05-30":"端午節","2025-10-10":"國慶日","2026-01-01":"元旦","2026-01-26":"除夕","2026-01-27":"初一","2026-01-28":"初二","2026-02-28":"和平紀念日","2026-04-04":"清明節","2026-05-01":"勞動節","2026-06-19":"端午節","2026-10-01":"中秋節","2026-10-10":"國慶日"};
+const PANTRY0 = ["鹽","糖","醬油","烏醋","米酒","豆瓣醬","紅蔥醬","胡椒粉","香油","辣椒醬","蒜頭","薑","蔥","番茄醬","味噌","太白粉","麻油"];
+
+const pad=n=>String(n).padStart(2,"0");
+const fmtD=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const WD=["日","一","二","三","四","五","六"];
+const CN=["一","二","三","四","五","六","七"];
+const addD=(d,n)=>{const r=new Date(d);r.setDate(r.getDate()+n);return r;};
+const getMon=()=>{const t=new Date();t.setHours(0,0,0,0);const df=t.getDay()===0?-6:1-t.getDay();t.setDate(t.getDate()+df);return t;};
+const getHol=d=>HOL[fmtD(d)];
+const isWknd=d=>d.getDay()===0||d.getDay()===6;
+const pick=arr=>arr[Math.floor(Math.random()*arr.length)];
+const shuffle=arr=>{const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+const C={bg:"#f7f3ee",card:"#fffefa",border:"#e8e0d5",accent:"#a07c6a",accentBg:"#f2ebe4",text:"#3a2e27",muted:"#9c8e84",green:"#7a9e7e",greenBg:"#eef4ee",red:"#b05a52"};
+
+// ═══════════════════════════════════════════════════════════════
+// 以食材為主導的菜單生成
+// ═══════════════════════════════════════════════════════════════
+function buildMenu(ings, sched, recentSet, pantry) {
+  // 使用者食材（依保鮮期排序，快過期優先）
+  const userIngs = [...ings].sort((a,b)=>a.days-b.days).map(i=>i.name);
+
+  // 一道菜「用到幾樣使用者食材」
+  const usesIng = (dishName) => {
+    const keys = DB[dishName].keys;
+    let count = 0, firstIdx = 99;
+    userIngs.forEach((ing, idx) => {
+      if (keys.some(k => ing.includes(k) || k.includes(ing))) {
+        count++; firstIdx = Math.min(firstIdx, idx);
+      }
+    });
+    return { count, firstIdx };
+  };
+
+  // 基本補菜（食材不足時用）：炒青菜、燙青菜、煎蛋類，這些幾乎家裡都有
+  const BASIC = ["炒高麗菜","蔥花蛋","蒸蛋","炒青江菜","燙花椰菜","清炒豆芽","紅蘿蔔炒蛋"];
+
+  // 依「是否用到食材 + 難度符合 + 未重複」挑菜
+  // matchLevel: 想要的難度集合
+  const buildPool = (types, allowDiff) => {
+    const all = types.flatMap(t=>byType(t));
+    return all
+      .map(n => ({ n, ...usesIng(n), recent:recentSet.has(n), diff:DB[n].diff }))
+      .filter(x => allowDiff.includes(x.diff))
+      .sort((a,b)=>{
+        // 1. 有用到食材的優先
+        if ((a.count>0) !== (b.count>0)) return a.count>0 ? -1 : 1;
+        // 2. 沒吃過的優先
+        if (a.recent !== b.recent) return a.recent ? 1 : -1;
+        // 3. 用到越多食材、食材越快過期越優先
+        if (b.count !== a.count) return b.count - a.count;
+        return a.firstIdx - b.firstIdx;
+      });
+  };
+
+  const used = new Set();
+  // 從候選池挑一道「有用到食材」的菜；若沒有，回傳 null（表示要補基本菜）
+  const pickReal = (pool) => {
+    for (const x of pool){ if(!used.has(x.n) && x.count>0){ used.add(x.n); return x.n; } }
+    return null;
+  };
+  const pickBasic = (allowDiff) => {
+    const cands = BASIC.filter(b=>DB[b] && allowDiff.includes(DB[b].diff) && !used.has(b));
+    const c = cands.length ? cands[0] : pick(BASIC);
+    used.add(c); return c;
+  };
+
+  const days = [];
+  let prevDinner = null;
+  for (let i=0;i<7;i++){
+    const sh = SHIFTS[sched[i].shift];
+    const me = sched[i].me;
+    // ── 難度判定 ──
+    // 兩人都沒空（愛迪生F/N不在 或 休假但你很忙；你"很忙"）→ 只出簡易(1)
+    // 兩人都有空（一起吃 且 你有空）→ 可出較複雜(含3)
+    // 其餘 → 簡易+普通(1,2)
+    let allowDiff;
+    const ginnyBusy = me === "很忙";
+    const together = sh.together;
+    if (ginnyBusy) allowDiff = [1];                    // 你很忙 → 只簡易
+    else if (together && me === "有空") allowDiff = [1,2,3]; // 都有空 → 可複雜
+    else allowDiff = [1,2];                             // 普通情況
+
+    let dinner, dishNames=[];
+    // 嘗試安排一鍋類（若有用到食材且難度符合）
+    const onePool = buildPool(["one"], allowDiff);
+    const oneHit = onePool.find(x=>x.count>0 && !used.has(x.n));
+    const wantOne = oneHit && (i%3===2); // 每隔幾天來個一鍋類
+
+    if (wantOne) {
+      used.add(oneHit.n);
+      const bPool = buildPool(["blanch"], [1]);
+      const veg = pickReal(bPool) || pickBasic([1]);
+      dinner = oneHit.n + "＋" + veg;
+      dishNames = [oneHit.n, veg];
+    } else {
+      const mainPool = buildPool(["main","egg"], allowDiff);
+      const vegPool = buildPool(["veg","blanch"], allowDiff.includes(1)?[1,2]:allowDiff);
+      const main = pickReal(mainPool) || pickBasic(allowDiff);
+      const veg = pickReal(vegPool) || pickBasic([1]);
+      dinner = "白飯＋" + main + "＋" + veg;
+      dishNames = [main, veg];
+    }
+    // 計算當天最高難度
+    const maxDiff = Math.max(...dishNames.map(n=>(DB[n]&&DB[n].diff)||1));
+    // 計算需補買的食材：菜的 keys 裡，使用者沒有、也不是常備調味料的
+    const pantryList = pantry || [];
+    const commonStuff = ["肉","蛋","蔥","蒜","薑","飯"]; // 太通用的不標(蛋蔥蒜薑通常有)
+    // 同義詞正規化（避免重複列出花椰菜/青花菜等）
+    const SYN = {"白花椰":"花椰菜","青花菜":"花椰菜","綠花椰":"花椰菜","蕃茄":"番茄","五花":"五花肉","肉片":"豬肉","肉絲":"豬肉"};
+    const norm = k => SYN[k] || k;
+    const missingSet = new Set();
+    dishNames.forEach(n=>{
+      if(!DB[n]) return;
+      DB[n].keys.forEach(k=>{
+        const hasIt = userIngs.some(ing=>ing.includes(k)||k.includes(ing));
+        const isPantry = pantryList.some(p=>p.includes(k)||k.includes(p));
+        const isCommon = commonStuff.includes(k);
+        if(!hasIt && !isPantry && !isCommon) missingSet.add(norm(k));
+      });
+    });
+    const missing = [...missingSet];
+    // F班：愛迪生13:00前可備料、Ginny晚上煮 → 標註請愛迪生先備料
+    const needPrep = sched[i].shift === "F";
+    const lunch = prevDinner ? prevDinner + "（前晚打包）" : "前一週剩菜或自理";
+    days.push({ day:CN[i], lunch, dinner, portions:sh.portions, together:sh.together, maxDiff, needPrep, missing });
+    prevDinner = dinner;
+  }
+  return { days };
+}
+
+function Card({children,style}){return <div style={{background:C.card,border:"1px solid "+C.border,borderRadius:16,padding:16,...style}}>{children}</div>;}
+function Label({children}){return <p style={{fontSize:10,fontWeight:700,letterSpacing:"0.15em",textTransform:"uppercase",color:C.muted,marginBottom:10}}>{children}</p>;}
+function Btn({children,onClick,disabled,ghost,sm}){return <button onClick={onClick} disabled={disabled} style={{padding:sm?"6px 14px":"11px 18px",borderRadius:12,fontSize:sm?11:13,fontWeight:600,cursor:disabled?"not-allowed":"pointer",background:ghost?"transparent":disabled?"#d5ccc5":C.accent,color:ghost?C.accent:"#fff",border:ghost?"1.5px solid "+C.accent:"none",opacity:disabled?0.7:1}}>{children}</button>;}
+function DayPill({date}){const h=getHol(date),w=isWknd(date);if(h)return <span style={{fontSize:10,padding:"2px 7px",borderRadius:99,background:C.greenBg,color:C.green,fontWeight:600,marginLeft:5}}>{h}</span>;if(w)return <span style={{fontSize:10,padding:"2px 7px",borderRadius:99,background:"#eceaf7",color:"#8884c0",marginLeft:5}}>週末</span>;return null;}
+function StatsBox({receipts}){if(!receipts.length)return null;const tF=receipts.reduce((s,r)=>s+(r.foodTotal||0),0),tA=receipts.reduce((s,r)=>s+(r.grandTotal||0),0),av=Math.round(tF/receipts.length);return <Card><Label>花費統計</Label><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>{[["累計食材","$"+tF.toLocaleString()],["累計總花費","$"+tA.toLocaleString()],["週均食材","$"+av.toLocaleString()]].map(([l,v])=><div key={l} style={{background:C.accentBg,borderRadius:12,padding:"10px 4px",textAlign:"center"}}><p style={{fontSize:14,fontWeight:600,color:C.accent}}>{v}</p><p style={{fontSize:10,color:C.muted,marginTop:2}}>{l}</p></div>)}</div></Card>;}
+
+function App(){
+  const [tab,setTab]=useState("food");
+  const [ings,setIngs]=useState([]);
+  const [ni,setNi]=useState({name:"",cat:"葉菜類",days:"",note:""});
+  const [pantry,setPantry]=useState(PANTRY0);
+  const [np,setNp]=useState("");
+  const [ws,setWs]=useState(getMon);
+  const [sched,setSched]=useState(()=>Array.from({length:7},(_,i)=>({i,shift:"D",me:"有空",note:""})));
+  const [menu,setMenu]=useState(null);
+  const [recipe,setRecipe]=useState(null);
+  const [hist,setHist]=useState([]);
+  const [deals,setDeals]=useState([]);
+  const [nd,setNd]=useState("");
+  const [shopRec,setShopRec]=useState(null);
+  const [rcpts,setRcpts]=useState([]);
+  const [nr,setNr]=useState({name:"",price:"",food:true});
+  const fruits=getFruits();
+
+  useEffect(()=>{try{const h=localStorage.getItem("h");if(h)setHist(JSON.parse(h));const ig=localStorage.getItem("ig");if(ig)setIngs(JSON.parse(ig));const pa=localStorage.getItem("pa");if(pa)setPantry(JSON.parse(pa));const rc=localStorage.getItem("rc");if(rc)setRcpts(JSON.parse(rc));}catch(e){}},[]);
+  const saveI=l=>{setIngs(l);try{localStorage.setItem("ig",JSON.stringify(l))}catch(e){}};
+  const saveP=l=>{setPantry(l);try{localStorage.setItem("pa",JSON.stringify(l))}catch(e){}};
+  const saveR=l=>{setRcpts(l);try{localStorage.setItem("rc",JSON.stringify(l))}catch(e){}};
+  const saveH=m=>{const h=[{date:new Date().toLocaleDateString("zh-TW"),menu:m},...hist].slice(0,4);setHist(h);try{localStorage.setItem("h",JSON.stringify(h))}catch(e){}};
+
+  const sorted=[...ings].sort((a,b)=>a.days-b.days);
+  const addIng=()=>{if(!ni.name.trim())return;const days=parseInt(ni.days)||CATS[ni.cat]||5;saveI([...ings,{...ni,days,id:Date.now()}]);setNi({name:"",cat:"葉菜類",days:"",note:""});};
+
+  const genMenu=()=>{
+    if(!ings.length){alert("請先輸入本週食材！");return;}
+    // 自動從歷史菜單抓最近吃過的菜色（最近2週）避免重複
+    const recentSet=new Set();
+    hist.slice(0,2).forEach(h=>{
+      (h.menu&&h.menu.days||[]).forEach(d=>{
+        (d.dinner||"").split(/[＋+、，,]/).forEach(x=>{const c=x.trim();if(c&&c!=="白飯")recentSet.add(c);});
+      });
+    });
+    const result=buildMenu(ings,sched,recentSet,pantry);
+    setMenu(result);saveH(result);setTab("menu");
+  };
+
+  const getRecipe=(dish)=>{
+    const clean=dish.replace(/（.*?）/g,"").replace(/白飯/,"").trim();
+    if(DB[clean])setRecipe({dish:clean,...DB[clean]});
+    else setRecipe({dish:clean,noData:true});
+  };
+
+  const genShopRec=()=>{
+    let pool=[];
+    if(deals.length){
+      deals.forEach(d=>{
+        Object.keys(DB).forEach(dish=>{
+          if(DB[dish].keys.some(k=>d.includes(k)||k.includes(d))&&!pool.includes(dish))pool.push(dish);
+        });
+      });
+    }
+    const all=Object.keys(DB).filter(d=>DB[d].type==="main"||DB[d].type==="one");
+    while(pool.length<6){const c=pick(all);if(!pool.includes(c))pool.push(c);}
+    setShopRec(pool.slice(0,8));
+  };
+
+  const addReceipt=()=>{
+    if(!nr.name.trim()||!nr.price)return;
+    const ex=rcpts[0]&&rcpts[0].draft?rcpts[0]:null;
+    const item={name:nr.name.trim(),price:parseInt(nr.price)||0,isFood:nr.food};
+    if(ex){const items=[...ex.items,item];const foodTotal=items.filter(x=>x.isFood).reduce((s,x)=>s+x.price,0);const grandTotal=items.reduce((s,x)=>s+x.price,0);saveR([{...ex,items,foodTotal,grandTotal},...rcpts.slice(1)]);}
+    else{const foodTotal=nr.food?item.price:0;saveR([{draft:true,id:Date.now(),date:new Date().toLocaleDateString("zh-TW"),items:[item],foodTotal,grandTotal:item.price},...rcpts]);}
+    setNr({name:"",price:"",food:true});
+  };
+  const finishReceipt=()=>{if(rcpts[0]&&rcpts[0].draft)saveR([{...rcpts[0],draft:false},...rcpts.slice(1)]);};
+
+  const TABS=[{id:"food",l:"食材"},{id:"sched",l:"行程"},{id:"menu",l:"菜單"},{id:"shop",l:"買菜"},{id:"hist",l:"歷史"},{id:"rcpt",l:"花費"}];
+
+  return (
+    <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'Noto Serif TC','Noto Sans TC',serif"}}>
+      <div style={{background:C.card,borderBottom:"1px solid "+C.border,padding:"22px 18px 14px"}}>
+        <h1 style={{fontSize:22,fontWeight:300,letterSpacing:"0.2em",color:C.text,margin:0}}>一週菜單</h1>
+        <p style={{fontSize:11,color:C.muted,marginTop:3,letterSpacing:"0.08em"}}>為 Ginny 與愛迪生規劃</p>
+      </div>
+      <div style={{display:"flex",background:C.card,borderBottom:"1px solid "+C.border,position:"sticky",top:0,zIndex:10}}>
+        {TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,padding:"11px 2px",fontSize:11,fontWeight:tab===t.id?700:400,color:tab===t.id?C.accent:C.muted,background:"transparent",border:"none",borderBottom:tab===t.id?"2px solid "+C.accent:"2px solid transparent",cursor:"pointer"}}>{t.l}</button>)}
+      </div>
+
+      <div style={{maxWidth:520,margin:"0 auto",padding:"14px 12px",display:"flex",flexDirection:"column",gap:12}}>
+
+        {tab==="food"&&<>
+          <Card>
+            <Label>新增食材</Label>
+            <div style={{display:"flex",flexDirection:"column",gap:9}}>
+              <input value={ni.name} onChange={e=>setNi(n=>({...n,name:e.target.value}))} onKeyDown={e=>e.key==="Enter"&&addIng()} placeholder="食材名稱（按 Enter 快速新增）" style={{width:"100%",background:C.bg,border:"1px solid "+C.border,borderRadius:12,padding:"10px 14px",fontSize:13,color:C.text,outline:"none",boxSizing:"border-box"}} />
+              <div style={{display:"flex",gap:8}}>
+                <select value={ni.cat} onChange={e=>setNi(n=>({...n,cat:e.target.value}))} style={{flex:1,background:C.bg,border:"1px solid "+C.border,borderRadius:12,padding:"10px 14px",fontSize:13,color:C.text,outline:"none"}}>{Object.keys(CATS).map(c=><option key={c}>{c}</option>)}</select>
+                <input value={ni.days} onChange={e=>setNi(n=>({...n,days:e.target.value}))} placeholder={"效期(預設"+CATS[ni.cat]+"天)"} type="number" style={{width:130,background:C.bg,border:"1px solid "+C.border,borderRadius:12,padding:"10px 14px",fontSize:13,color:C.text,outline:"none"}} />
+              </div>
+              <input value={ni.note} onChange={e=>setNi(n=>({...n,note:e.target.value}))} placeholder="備註（選填）" style={{width:"100%",background:C.bg,border:"1px solid "+C.border,borderRadius:12,padding:"10px 14px",fontSize:13,color:C.text,outline:"none",boxSizing:"border-box"}} />
+              <Btn onClick={addIng}>＋ 加入食材</Btn>
+            </div>
+          </Card>
+          {sorted.length>0&&<Card>
+            <Label>本週食材 · {sorted.length} 項</Label>
+            <div style={{display:"flex",flexDirection:"column",gap:7}}>
+              {sorted.map(g=><div key={g.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",borderRadius:12,padding:"9px 13px",background:g.days<=2?"#faeaea":g.days<=4?C.accentBg:C.bg}}>
+                <div><span style={{fontSize:13,fontWeight:500,color:C.text}}>{g.name}</span><span style={{fontSize:11,color:C.muted,marginLeft:7}}>{g.cat}</span>{g.note&&<span style={{fontSize:11,color:C.muted,marginLeft:4}}>· {g.note}</span>}<div style={{fontSize:11,marginTop:2,color:g.days<=2?C.red:C.muted}}>{g.days<=2?"⚠ 優先使用":"剩 "+g.days+" 天"}</div></div>
+                <button onClick={()=>saveI(ings.filter(i=>i.id!==g.id))} style={{fontSize:18,color:C.muted,background:"none",border:"none",cursor:"pointer",paddingLeft:10}}>×</button>
+              </div>)}
+            </div>
+          </Card>}
+          <Card>
+            <Label>常備調味料</Label>
+            <p style={{fontSize:11,color:C.muted,marginBottom:10}}>家中已有，不需採買</p>
+            <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:10}}>{pantry.map(item=><span key={item} style={{display:"inline-flex",alignItems:"center",gap:3,padding:"4px 9px",borderRadius:99,fontSize:11,background:C.accentBg,color:C.accent}}>{item}<button onClick={()=>saveP(pantry.filter(p=>p!==item))} style={{background:"none",border:"none",color:C.accent,cursor:"pointer",fontSize:13,padding:0,opacity:0.6}}>×</button></span>)}</div>
+            <div style={{display:"flex",gap:8}}>
+              <input value={np} onChange={e=>setNp(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&np.trim()){saveP([...pantry,np.trim()]);setNp("");}}} placeholder="新增調味料" style={{flex:1,background:C.bg,border:"1px solid "+C.border,borderRadius:12,padding:"9px 13px",fontSize:13,color:C.text,outline:"none"}} />
+              <Btn sm onClick={()=>{if(np.trim()){saveP([...pantry,np.trim()]);setNp("");}}}>＋</Btn>
+            </div>
+          </Card>
+          <div style={{fontSize:11,color:C.muted,textAlign:"center",padding:"4px 0"}}>系統會自動記住最近的菜單，生成新菜單時避免重複。</div>
+        </>}
+
+        {tab==="sched"&&<>
+          <Card>
+            <Label>週別選擇</Label>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <button onClick={()=>setWs(addD(ws,-7))} style={{width:36,height:36,borderRadius:10,border:"1px solid "+C.border,background:C.bg,color:C.muted,cursor:"pointer",fontSize:18}}>‹</button>
+              <div style={{flex:1,textAlign:"center",fontSize:13,fontWeight:500,color:C.text}}>{(ws.getMonth()+1)}/{ws.getDate()} — {(addD(ws,6).getMonth()+1)}/{addD(ws,6).getDate()}</div>
+              <button onClick={()=>setWs(addD(ws,7))} style={{width:36,height:36,borderRadius:10,border:"1px solid "+C.border,background:C.bg,color:C.muted,cursor:"pointer",fontSize:18}}>›</button>
+              <Btn sm onClick={()=>setWs(getMon())}>本週</Btn>
+            </div>
+          </Card>
+          <Card>
+            <Label>班別說明</Label>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{SK.map(k=>{const s=SHIFTS[k];return <div key={k} style={{borderRadius:8,padding:"5px 9px",background:s.color,fontSize:11}}><span style={{fontWeight:600,color:C.text}}>{s.label}</span> <span style={{color:C.muted}}>{s.time}·{s.portions}人</span></div>;})}</div>
+          </Card>
+          <Card>
+            <Label>本週行程</Label>
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {sched.map((s,i)=>{const d=addD(ws,i);const sh=SHIFTS[s.shift];return <div key={i} style={{borderRadius:14,padding:13,background:C.bg,border:"1px solid "+C.border}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:9}}>
+                  <div style={{display:"flex",alignItems:"center",flexWrap:"wrap"}}><span style={{fontSize:13,fontWeight:500,color:C.text}}>{(d.getMonth()+1)}/{d.getDate()}（{WD[d.getDay()]}）</span><DayPill date={d} /></div>
+                  <span style={{fontSize:11,padding:"2px 9px",borderRadius:99,background:sh.color,color:C.text}}>{sh.label}</span>
+                </div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:8}}>{SK.map(k=><button key={k} onClick={()=>setSched(sc=>sc.map((x,j)=>j===i?{...x,shift:k}:x))} style={{padding:"5px 13px",borderRadius:10,fontSize:12,fontWeight:500,cursor:"pointer",border:"none",background:s.shift===k?C.accent:SHIFTS[k].color,color:s.shift===k?"#fff":C.text}}>{k}</button>)}</div>
+                <p style={{fontSize:10,color:C.muted,marginBottom:7}}>{sh.desc}</p>
+                <div style={{display:"flex",gap:7}}>
+                  <select value={s.me} onChange={e=>setSched(sc=>sc.map((x,j)=>j===i?{...x,me:e.target.value}:x))} style={{flex:1,background:C.card,border:"1px solid "+C.border,borderRadius:10,padding:"7px 11px",fontSize:12,color:C.text,outline:"none"}}><option>Ginny有空</option><option>Ginny普通</option><option>Ginny很忙</option></select>
+                  <input value={s.note} onChange={e=>setSched(sc=>sc.map((x,j)=>j===i?{...x,note:e.target.value}:x))} placeholder="備註" style={{flex:1,background:C.card,border:"1px solid "+C.border,borderRadius:10,padding:"7px 11px",fontSize:12,color:C.text,outline:"none"}} />
+                </div>
+              </div>;})}
+            </div>
+            <div style={{marginTop:12}}><Btn onClick={genMenu}>生成本週菜單</Btn></div>
+          </Card>
+        </>}
+
+        {tab==="menu"&&<>
+          {!menu&&<div style={{textAlign:"center",padding:"50px 0"}}><p style={{fontSize:36,marginBottom:10}}>🍱</p><p style={{fontSize:13,color:C.muted,marginBottom:16}}>請先填好食材與行程</p><Btn onClick={()=>setTab("food")}>前往填寫食材</Btn></div>}
+          {menu&&<>
+            <div style={{borderRadius:14,padding:"11px 15px",fontSize:12,background:C.accentBg,color:C.accent}}>優先使用 Ginny 輸入的食材（快過期的先用），每道菜都可點開看食譜。</div>
+            {(menu.days||[]).map((d,i)=>{const sh=SHIFTS[sched[i]&&sched[i].shift]||SHIFTS.D;const dd=addD(ws,i);const ld=(d.lunch||"").replace(/（.*?）/g,"").split(/[＋+、，,]/).map(x=>x.trim()).filter(x=>x&&x!=="白飯");const dn=(d.dinner||"").split(/[＋+、，,]/).map(x=>x.trim()).filter(x=>x&&x!=="白飯");const dl=d.maxDiff||1;const diffLbl=dl===1?"簡易":dl===2?"普通":"較費工";const diffBg=dl===1?C.greenBg:dl===2?C.accentBg:"#f5e6e0";const diffCo=dl===1?C.green:dl===2?C.accent:C.red;const userNames=ings.map(x=>x.name);const SYN={"蕃茄":"番茄","白花椰":"花椰菜","青花菜":"花椰菜","綠花椰":"花椰菜","五花":"豬肉","肉片":"豬肉","肉絲":"豬肉","絞肉":"豬肉","里肌":"豬肉"};const norm=k=>SYN[k]||k;const missing=[];dn.forEach(dish=>{const r=DB[dish];if(!r)return;r.keys.forEach(k=>{const nk=norm(k);const have=userNames.some(u=>u.includes(nk)||nk.includes(u)||u.includes(k)||k.includes(u))||pantry.some(p=>p.includes(nk)||nk.includes(p));if(!have&&!missing.includes(nk))missing.push(nk);});});return <Card key={i}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                <div style={{display:"flex",alignItems:"center",flexWrap:"wrap"}}><span style={{fontWeight:600,fontSize:14,color:C.text}}>{"（"+CN[i]+"）"}</span><span style={{fontSize:11,color:C.muted,marginLeft:7}}>{(dd.getMonth()+1)}/{dd.getDate()}（{WD[dd.getDay()]}）</span><DayPill date={dd} /></div>
+                <span style={{fontSize:11,padding:"2px 9px",borderRadius:99,background:sh.color,color:C.text}}>{sh.label}</span>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:9}}>
+                <span style={{fontSize:11,borderRadius:9,padding:"4px 9px",background:sh.color,color:C.muted}}>{sh.together?"👫 一起吃":"🙋 各自吃"} · 煮 {sh.portions} 人份</span>
+                <span style={{fontSize:11,borderRadius:9,padding:"4px 9px",background:diffBg,color:diffCo,fontWeight:600}}>{"◆".repeat(dl)} {diffLbl}</span>
+                {d.needPrep&&<span style={{fontSize:11,borderRadius:9,padding:"4px 9px",background:"#fdf0e0",color:"#b8860b",fontWeight:600}}>🔪 請愛迪生先備料</span>}
+              </div>
+              <div style={{borderRadius:12,padding:11,marginBottom:8,background:C.bg}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:5}}><span style={{fontSize:11,color:C.muted}}>午餐</span><span style={{fontSize:10,padding:"1px 7px",borderRadius:99,background:C.accentBg,color:C.accent}}>便當</span></div>
+                <p style={{fontSize:13,color:C.text,marginBottom:7}}>{d.lunch}</p>
+                <div>{ld.map(x=><button key={x} onClick={()=>getRecipe(x)} style={{fontSize:11,padding:"3px 9px",borderRadius:99,background:C.accentBg,color:C.accent,border:"1px solid "+C.border,cursor:"pointer",margin:"2px 3px 2px 0"}}>📖 {x}</button>)}</div>
+              </div>
+              <div style={{borderRadius:12,padding:11,background:C.greenBg}}>
+                <p style={{fontSize:11,color:C.muted,marginBottom:5}}>晚餐 → 打包隔天便當</p>
+                <p style={{fontSize:13,color:C.text,marginBottom:7}}>{d.dinner}</p>
+                <div>{dn.map(x=><button key={x} onClick={()=>getRecipe(x)} style={{fontSize:11,padding:"3px 9px",borderRadius:99,background:"#deeede",color:C.green,border:"1px solid #c8e0c8",cursor:"pointer",margin:"2px 3px 2px 0"}}>📖 {x}</button>)}</div>
+              </div>
+              {missing.length>0&&<div style={{marginTop:9,borderRadius:10,padding:"8px 11px",background:"#fcebea",border:"1px dashed "+C.red}}>
+                <p style={{fontSize:11,color:C.red,fontWeight:600,marginBottom:5}}>🛒 需補買食材</p>
+                <div style={{display:"flex",flexWrap:"wrap",gap:4}}>{missing.map((m,mi)=><span key={mi} style={{fontSize:11,padding:"2px 8px",borderRadius:99,background:"#fff",color:C.red,border:"1px solid "+C.red}}>{m}</span>)}</div>
+              </div>}
+            </Card>;})}
+            <Btn onClick={genMenu}>🔄 重新生成（換一批菜色）</Btn>
+          </>}
+        </>}
+
+        {tab==="shop"&&<>
+          <Card>
+            <Label>本週特價食材</Label>
+            <p style={{fontSize:11,color:C.muted,marginBottom:10}}>看完全聯傳單後輸入，下方推薦能用到的菜色</p>
+            <div style={{display:"flex",gap:7,marginBottom:9}}>
+              <input value={nd} onChange={e=>setNd(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&nd.trim()){setDeals(d=>[...d,nd.trim()]);setNd("");}}} placeholder="例：豬肉、高麗菜、蝦仁" style={{flex:1,background:C.bg,border:"1px solid "+C.border,borderRadius:12,padding:"9px 13px",fontSize:13,color:C.text,outline:"none"}} />
+              <Btn sm onClick={()=>{if(nd.trim()){setDeals(d=>[...d,nd.trim()]);setNd("");}}}>＋</Btn>
+            </div>
+            {deals.length>0&&<div style={{display:"flex",flexWrap:"wrap",gap:5}}>{deals.map((dl,i)=><span key={i} style={{display:"inline-flex",alignItems:"center",gap:3,padding:"4px 9px",borderRadius:99,fontSize:11,background:C.accentBg,color:C.accent}}>{dl}<button onClick={()=>setDeals(d=>d.filter((_,j)=>j!==i))} style={{background:"none",border:"none",color:C.accent,cursor:"pointer",opacity:0.6}}>×</button></span>)}</div>}
+          </Card>
+          <Card>
+            <Label>當季水果參考</Label>
+            <p style={{fontSize:11,color:C.muted,marginBottom:10}}>前後一個月當季 · ★ 本月盛產 · 粗體為常買</p>
+            <div style={{display:"flex",flexWrap:"wrap",gap:5}}>{fruits.map(f=><span key={f.name} style={{display:"inline-block",padding:"5px 11px",borderRadius:99,fontSize:12,background:f.peak?C.greenBg:C.bg,color:f.peak?C.green:C.muted,border:"1px solid "+(f.peak?"#c8e0c8":C.border),fontWeight:f.fav?700:400}}>{f.peak?"★ ":""}{f.name}</span>)}</div>
+          </Card>
+          <Card>
+            <Label>推薦本週菜色</Label>
+            <div style={{marginBottom:10}}><Btn onClick={genShopRec}>根據特價推薦菜色</Btn></div>
+            {shopRec&&<><p style={{fontSize:11,color:C.muted,marginBottom:9}}>能用到特價食材的菜（點開看食譜）：</p><div style={{display:"flex",flexWrap:"wrap",gap:5}}>{shopRec.map((d,i)=><button key={i} onClick={()=>getRecipe(d)} style={{fontSize:12,padding:"5px 11px",borderRadius:99,background:C.accentBg,color:C.accent,border:"1px solid "+C.border,cursor:"pointer"}}>📖 {d}</button>)}</div></>}
+          </Card>
+        </>}
+
+        {tab==="hist"&&(hist.length===0?<div style={{textAlign:"center",padding:"50px 0"}}><p style={{fontSize:36,marginBottom:10}}>📋</p><p style={{fontSize:13,color:C.muted}}>尚無歷史記錄</p></div>:hist.map((h,hi)=><Card key={hi}><p style={{fontSize:11,fontWeight:700,color:C.accent,marginBottom:8}}>{h.date}</p>{(h.menu&&h.menu.days||[]).map((d,i)=><div key={i} style={{fontSize:12,color:C.muted,marginBottom:5}}><span style={{fontWeight:600,color:C.text}}>{"（"+CN[i]+"）"}</span>　午：{d.lunch}　晚：{d.dinner}</div>)}</Card>))}
+
+        {tab==="rcpt"&&<>
+          <Card>
+            <Label>記錄花費</Label>
+            <p style={{fontSize:11,color:C.muted,marginBottom:10}}>手動輸入發票品項，自動統計食材花費</p>
+            <div style={{display:"flex",gap:7,marginBottom:8}}>
+              <input value={nr.name} onChange={e=>setNr(n=>({...n,name:e.target.value}))} placeholder="品項名稱" style={{flex:2,background:C.bg,border:"1px solid "+C.border,borderRadius:12,padding:"9px 13px",fontSize:13,color:C.text,outline:"none"}} />
+              <input value={nr.price} onChange={e=>setNr(n=>({...n,price:e.target.value}))} placeholder="金額" type="number" style={{flex:1,background:C.bg,border:"1px solid "+C.border,borderRadius:12,padding:"9px 13px",fontSize:13,color:C.text,outline:"none"}} />
+            </div>
+            <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:10}}>
+              <button onClick={()=>setNr(n=>({...n,food:!n.food}))} style={{padding:"6px 14px",borderRadius:99,fontSize:12,fontWeight:600,cursor:"pointer",border:"none",background:nr.food?C.greenBg:C.bg,color:nr.food?C.green:C.muted}}>{nr.food?"🥦 食材":"非食材"}</button>
+              <span style={{fontSize:11,color:C.muted}}>點擊切換分類</span>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <Btn onClick={addReceipt}>＋ 加入品項</Btn>
+              {rcpts[0]&&rcpts[0].draft&&<Btn ghost onClick={finishReceipt}>完成這張發票</Btn>}
+            </div>
+          </Card>
+          <StatsBox receipts={rcpts.filter(r=>!r.draft)} />
+          {rcpts.map(r=><Card key={r.id} style={r.draft?{border:"2px solid "+C.accent}:{}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:9}}>
+              <div><span style={{fontSize:13,fontWeight:500,color:C.text}}>{r.date}</span>{r.draft&&<span style={{fontSize:11,color:C.accent,marginLeft:7}}>編輯中</span>}</div>
+              <button onClick={()=>saveR(rcpts.filter(x=>x.id!==r.id))} style={{fontSize:18,color:C.muted,background:"none",border:"none",cursor:"pointer"}}>×</button>
+            </div>
+            <div style={{display:"flex",gap:7,marginBottom:9}}>
+              <div style={{flex:1,borderRadius:10,padding:8,textAlign:"center",background:C.greenBg}}><p style={{fontSize:14,fontWeight:600,color:C.green}}>${(r.foodTotal||0).toLocaleString()}</p><p style={{fontSize:10,color:C.muted}}>食材</p></div>
+              <div style={{flex:1,borderRadius:10,padding:8,textAlign:"center",background:C.accentBg}}><p style={{fontSize:14,fontWeight:600,color:C.accent}}>${(r.grandTotal||0).toLocaleString()}</p><p style={{fontSize:10,color:C.muted}}>總計</p></div>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:3}}>{(r.items||[]).map((item,ii)=><div key={ii} style={{display:"flex",justifyContent:"space-between",borderRadius:8,padding:"5px 11px",fontSize:12,background:item.isFood?C.greenBg:C.bg,color:item.isFood?C.text:C.muted}}><span>{item.isFood?"🥦 ":""}{item.name}</span><span>${(item.price||0).toLocaleString()}</span></div>)}</div>
+          </Card>)}
+        </>}
+
+      </div>
+
+      {recipe&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.28)",zIndex:50,display:"flex",alignItems:"flex-end"}} onClick={()=>setRecipe(null)}>
+        <div style={{width:"100%",maxWidth:520,margin:"0 auto",borderRadius:"22px 22px 0 0",padding:20,maxHeight:"80vh",overflowY:"auto",background:C.card}} onClick={e=>e.stopPropagation()}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+            <h3 style={{fontSize:16,fontWeight:600,color:C.text}}>{recipe.dish}</h3>
+            <button onClick={()=>setRecipe(null)} style={{fontSize:20,color:C.muted,background:"none",border:"none",cursor:"pointer"}}>×</button>
+          </div>
+          {recipe.noData&&<p style={{fontSize:13,color:C.muted,padding:"10px 0"}}>這道菜暫無詳細食譜。基本做法：食材洗淨切好，熱油爆香蒜或蔥，下主料炒熟，以鹽、醬油調味即可。</p>}
+          {recipe.ing&&<>
+            <div style={{marginBottom:14}}><p style={{fontSize:10,fontWeight:700,color:C.muted,marginBottom:7,letterSpacing:"0.12em"}}>食材</p><div style={{display:"flex",flexWrap:"wrap",gap:5}}>{recipe.ing.map((x,i)=><span key={i} style={{fontSize:11,padding:"4px 10px",borderRadius:99,background:C.accentBg,color:C.accent}}>{x}</span>)}</div></div>
+            <div style={{marginBottom:14}}><p style={{fontSize:10,fontWeight:700,color:C.muted,marginBottom:7,letterSpacing:"0.12em"}}>步驟</p><ol style={{listStyle:"none",margin:0,padding:0,display:"flex",flexDirection:"column",gap:8}}>{recipe.steps.map((s,i)=><li key={i} style={{display:"flex",gap:9,fontSize:13,color:C.text}}><span style={{fontWeight:700,color:C.accent,flexShrink:0}}>{i+1}.</span><span>{s}</span></li>)}</ol></div>
+            {recipe.tip&&<div style={{borderRadius:12,padding:"11px 14px",fontSize:12,background:C.greenBg,color:C.green}}>💡 {recipe.tip}</div>}
+          </>}
+        </div>
+      </div>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+  </script>
+</body>
+</html>
